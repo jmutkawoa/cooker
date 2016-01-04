@@ -1,0 +1,7 @@
+setup.py
+src/cooker.py
+src/cooker.egg-info/PKG-INFO
+src/cooker.egg-info/SOURCES.txt
+src/cooker.egg-info/dependency_links.txt
+src/cooker.egg-info/requires.txt
+src/cooker.egg-info/top_level.txt
