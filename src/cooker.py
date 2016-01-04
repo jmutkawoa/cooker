@@ -24,7 +24,7 @@ class cooker:
 	
 	def __init__(self,action = None ):
 		if not (action is None):
-			self.DEFAULT_ACTION = self.DEFAULT_ACTION
+			self.DEFAULT_ACTION = action
 			warn("%s Mode selected" % (action)) 
 		else:
 			assert action in self.OPTIONS['action'], "action must be one of: %s" % (self.OPTIONS['action'])
@@ -68,21 +68,21 @@ class cooker:
 	def package_ensure(self,package):
 		def func_not_found(): 
         		print "No Function " + self.i + " Found!"
-		func_name = self.getPackage + "_package_ensure"
+		func_name = self.getPackage() + "_package_ensure"
 		func = getattr(self,func_name,func_not_found)
 		func(package)
 
 	def apt_package_ensure(self,package):
-		if (self.DEFAULT_ACTION is "local"):
+		if (self.getMode() is "local"):
 			return local("apt-get install %s" % package)
 		if self.isSudo():
 			return sudo("apt-get install %s" % package)
-		return local("apt-get install %s" % package)
+		return run("apt-get install %s" % package)
 
 	def yum_package_ensure(self,package):
-		if (self.DEFAULT_ACTION is "local"):
+		if (self.getMode() is "local"):
 			return local("yum install %s" % package)
 		if self.isSudo():
 			return sudo("yum install %s" % package)
-		return local("yum install %s" % package)
+		return run("yum install %s" % package)
 
