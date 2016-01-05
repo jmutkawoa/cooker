@@ -22,13 +22,14 @@ class cooker:
 		action 	 = ["local", "remote"]
 	)
 	
-	def __init__(self,action = None ):
+	def __init__(self,action = None,warn_only = True ):
 		if not (action is None):
 			self.DEFAULT_ACTION = action
 			warn("%s Mode selected" % (action)) 
 		else:
 			assert action in self.OPTIONS['action'], "action must be one of: %s" % (self.OPTIONS['action'])
 		env.host_string = "127.0.0.1"
+		env.warn_only = warn_only
 	def isSudo(self):
 		return self.SUDO
 
@@ -65,24 +66,33 @@ class cooker:
 	# Repository functions
 	#=============================
 
-	def package_ensure(self,package):
+	def package_ensure(self,*args):
 		def func_not_found(): 
         		print "No Function " + self.i + " Found!"
-		func_name = self.getPackage() + "_package_ensure"
-		func = getattr(self,func_name,func_not_found)
-		func(package)
+		for package in args:
+			func_name = self.getPackage() + "_package_ensure"
+			func = getattr(self,func_name,func_not_found)
+			func(package)
 
 	def apt_package_ensure(self,package):
 		if (self.getMode() is "local"):
-			return local("apt-get install %s" % package)
+			return local("apt-get install -y %s" % package )
 		if self.isSudo():
-			return sudo("apt-get install %s" % package)
-		return run("apt-get install %s" % package)
+			return sudo("apt-get install -y %s" % package)
+		return run("apt-get install -y %s" % package)
 
 	def yum_package_ensure(self,package):
 		if (self.getMode() is "local"):
-			return local("yum install %s" % package)
-		if self.isSudo():
-			return sudo("yum install %s" % package)
-		return run("yum install %s" % package)
+			status = local("yum install -y %s" % package,True)
+		elif (self.isSudo()):
+			status = sudo("yum install -y %s" % package)
+		else:
+			status = run("yum install -y %s" % package)
+
+		if "Complete" in status:
+			puts("Package %s installed" % package)
+			return True
+		else:
+			warn("Package %s not installed" % package)
+			return False
 
