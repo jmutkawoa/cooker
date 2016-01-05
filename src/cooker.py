@@ -8,6 +8,7 @@ import os, re, tempfile, sys, time
 import fabric , fabric.operations, fabric.context_managers
 import ansible
 from fabric.api import *
+from fabric.contrib.files import *
 
 
 class cooker:
@@ -30,6 +31,7 @@ class cooker:
 			assert action in self.OPTIONS['action'], "action must be one of: %s" % (self.OPTIONS['action'])
 		env.host_string = "127.0.0.1"
 		env.warn_only = warn_only
+
 	def isSudo(self):
 		return self.SUDO
 
@@ -61,6 +63,13 @@ class cooker:
 	def getPackage(self):
 		return self.DEFAULT_PACKAGE
 
+	def run(self,command):
+		if (self.getMode() is "local"):
+			return local(command)
+		if self.isSudo():
+			return sudo(command)
+		return run(command)
+
 	# ============================
 	#
 	# Repository functions
@@ -74,12 +83,22 @@ class cooker:
 			func = getattr(self,func_name,func_not_found)
 			func(package)
 
+	def update(self):
+		def func_not_found(): 
+        		print "No Function " + self.i + " Found!"
+		func_name = self.getPackage() + "_update"
+		func = getattr(self,func_name,func_not_found)
+		func()
+
 	def apt_package_ensure(self,package):
 		if (self.getMode() is "local"):
 			return local("apt-get install -y %s" % package )
 		if self.isSudo():
 			return sudo("apt-get install -y %s" % package)
 		return run("apt-get install -y %s" % package)
+
+	def apt_update(self):
+		return self.run("apt-get -y update")
 
 	def yum_package_ensure(self,package):
 		if (self.getMode() is "local"):
@@ -96,3 +115,32 @@ class cooker:
 			warn("Package %s not installed" % package)
 			return False
 
+	def yum_update(self):
+		return self.run("yum -y update")
+
+	# ========================
+	#
+	# OS Utilities
+	#=========================
+
+	def copy(self,source=None,destination=None,recursive=None):
+		if (source is None) or (destination is None):
+			fabric.utils.abort("Source and Destination must be specified")
+		if recursive is None:
+			self.run("cp %s %s" % (source,destination))
+		else:
+			self.run("cp -r %s %s" % (source,destination))
+
+	def move(self,source=None,destination=None):
+		if (source is None) or (destination is None):
+			fabric.utils.abort("Source and Destination must be specified")
+		self.run("mv %s %s" % (source,destination))
+
+	def fileContains(self,path,text,exact):
+		if (self.getMode() is "local"):
+			result = local("grep %s %s" %(text,path),True)
+			if result.return_code == 0:
+				return True
+			else:
+				return False
+		return fabric.contrib.files.contains(path,text,exact)
