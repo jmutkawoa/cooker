@@ -64,11 +64,12 @@ class cooker:
 		return self.DEFAULT_PACKAGE
 
 	def run(self,command):
-		if (self.getMode() is "local"):
-			return local(command)
-		if self.isSudo():
-			return sudo(command)
-		return run(command)
+		with settings(warn_only=True):
+			if (self.getMode() is "local"):
+				return local(command,True)
+			if self.isSudo():
+				return sudo(command,pty=False)
+			return run(command,pty=False)
 
 	# ============================
 	#
@@ -144,3 +145,15 @@ class cooker:
 			else:
 				return False
 		return fabric.contrib.files.contains(path,text,exact)
+
+	def fileCompare(self,file1,file2):
+		cmd = "openssl dgst -md5 %s|awk '{print $2}'"
+
+		file1 = self.run(cmd  % (file1))
+		file2 = self.run(cmd % (file2))
+		
+		if file1 == file2:
+			print "SAME"
+			return True
+		print "NOT SAME"
+		return False
