@@ -146,14 +146,26 @@ class cooker:
 				return False
 		return fabric.contrib.files.contains(path,text,exact)
 
-	def fileCompare(self,file1,file2):
+	def fileIso(self,file1,file2):
 		cmd = "openssl dgst -md5 %s|awk '{print $2}'"
-
 		file1 = self.run(cmd  % (file1))
 		file2 = self.run(cmd % (file2))
-		
 		if file1 == file2:
-			print "SAME"
 			return True
-		print "NOT SAME"
 		return False
+
+	def createUser(self,user,password = None,home = None,shell = None,group = None,createHome = True ):
+		if(self.fileContains("/etc/passwd",user,False)):
+			warn("User %s already exists!!!" % user)
+			return False
+		options = []
+		if home:
+			options.append(" -d %s" % (home))
+		if shell:
+			options.append(" -s %s" % (shell))
+		if group:
+			options.append(" -g %s" % (group))
+		if createHome:
+			options.append(" -m")
+		self.run("useradd %s %s" % (user,"".join(options)))
+
