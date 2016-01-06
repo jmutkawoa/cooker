@@ -183,7 +183,9 @@ class cooker:
 		if user:
 			self.run("userdel %s %s" % ("".join(options),user))
 		elif uid:
-			user = self.run("getent passwd %s| cut -d: -f1" % (uid))
+			user = self.run("getent passwd %s| cut -d: -f1 |grep ''" % (uid))
+			if (user.return_code != 0):
+				return False
 			self.deleteUser(user,deleteHome=deleteHome)
 
 
