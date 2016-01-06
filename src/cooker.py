@@ -147,6 +147,7 @@ class cooker:
 		return fabric.contrib.files.contains(path,text,exact)
 
 	def fileIso(self,file1,file2):
+		'''Check if two files are iso'''
 		cmd = "openssl dgst -md5 %s|awk '{print $2}'"
 		file1 = self.run(cmd  % (file1))
 		file2 = self.run(cmd % (file2))
@@ -155,6 +156,7 @@ class cooker:
 		return False
 
 	def createUser(self,user,password = None,home = None,shell = None,group = None,createHome = True ):
+		'''Create new user'''
 		if(self.fileContains("/etc/passwd",user,False)):
 			warn("User %s already exists!!!" % user)
 			return False
@@ -167,5 +169,22 @@ class cooker:
 			options.append(" -g %s" % (group))
 		if createHome:
 			options.append(" -m")
-		self.run("useradd %s %s" % (user,"".join(options)))
+		result = self.run("useradd %s %s" % (user,"".join(options)))
+		if password:
+			if result.return_code == 0:
+				password = local("openssl passwd %s" % (password),True)
+				self.run("usermod -p %s %s" % (password,user))
+
+	def deleteUser(self,user = None,uid=None,deleteHome = False):
+		'''Delete User'''
+		options = []
+		if deleteHome:
+			options.append(" -r")
+		if user:
+			self.run("userdel %s %s" % ("".join(options),user))
+		elif uid:
+			user = self.run("getent passwd %s| cut -d: -f1" % (uid))
+			self.deleteUser(user,deleteHome=deleteHome)
+
+
 
