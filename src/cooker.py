@@ -181,7 +181,10 @@ class cooker:
 		if deleteHome:
 			options.append(" -r")
 		if user:
-			self.run("userdel %s %s" % ("".join(options),user))
+			codeReturn = self.run("userdel %s %s" % ("".join(options),user))
+			if codeReturn == 0:
+				return True
+			return False
 		elif uid:
 			user = self.run("getent passwd %s| cut -d: -f1 |grep ''" % (uid))
 			if (user.return_code != 0):
