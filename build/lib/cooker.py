@@ -198,6 +198,11 @@ class cooker:
 				return False
 			self.deleteUser(user,deleteHome=deleteHome)
 
+
+	# ========================
+	#
+	# Directory Utilities
+	#=========================
 	def dir_exists(self,directory):
 		'''Check if directory exists'''
 		return self.run("test -d %s" % (directory))
@@ -215,7 +220,7 @@ class cooker:
 		if user:
 			self.run("chown %s %s %s" % (recursive,user,location))
 
-	def ensureDirectory(self,destination = None , user =None,group = None, permissions =None,recursive= False):
+	def dir_ensure(self,destination = None , user =None,group = None, permissions =None,recursive= False):
 		'''Ensures a directory is created'''
 		if (destination is None):
 			warn("Destination of directory must be specified")
@@ -226,6 +231,3 @@ class cooker:
 		else:
 			self.run("mkdir -p %s" % (destination))
 			self.dir_setAttr(destination,user,group,permissions,recursive)
-
-
-
