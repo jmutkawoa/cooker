@@ -77,6 +77,7 @@ class cooker:
 	#=============================
 
 	def package_ensure(self,*args):
+		'''Package ensure dispatcher'''
 		def func_not_found(): 
         		print "No Function " + self.i + " Found!"
 		for package in args:
@@ -85,6 +86,7 @@ class cooker:
 			func(package)
 
 	def update(self):
+		'''Update dispatcher'''
 		def func_not_found(): 
         		print "No Function " + self.i + " Found!"
 		func_name = self.getPackage() + "_update"
@@ -102,6 +104,7 @@ class cooker:
 		return self.run("apt-get -y update")
 
 	def yum_package_ensure(self,package):
+		'''Install Package using yum'''
 		if (self.getMode() is "local"):
 			status = local("yum install -y %s" % package,True)
 		elif (self.isSudo()):
@@ -117,6 +120,7 @@ class cooker:
 			return False
 
 	def yum_update(self):
+		'''Updates the OS'''
 		return self.run("yum -y update")
 
 	# ========================
@@ -125,6 +129,7 @@ class cooker:
 	#=========================
 
 	def copy(self,source=None,destination=None,recursive=None):
+		'''Copy file from one destination to another'''
 		if (source is None) or (destination is None):
 			fabric.utils.abort("Source and Destination must be specified")
 		if recursive is None:
@@ -133,11 +138,13 @@ class cooker:
 			self.run("cp -r %s %s" % (source,destination))
 
 	def move(self,source=None,destination=None):
+		'''Move file from one destination to the other'''
 		if (source is None) or (destination is None):
 			fabric.utils.abort("Source and Destination must be specified")
 		self.run("mv %s %s" % (source,destination))
 
 	def fileContains(self,path,text,exact):
+		'''Check if file contains the searched keywoord'''
 		if (self.getMode() is "local"):
 			result = local("grep %s %s" %(text,path),True)
 			if result.return_code == 0:
@@ -181,12 +188,44 @@ class cooker:
 		if deleteHome:
 			options.append(" -r")
 		if user:
-			self.run("userdel %s %s" % ("".join(options),user))
+			codeReturn = self.run("userdel %s %s" % ("".join(options),user))
+			if codeReturn == 0:
+				return True
+			return False
 		elif uid:
 			user = self.run("getent passwd %s| cut -d: -f1 |grep ''" % (uid))
 			if (user.return_code != 0):
 				return False
 			self.deleteUser(user,deleteHome=deleteHome)
+
+	def dir_exists(self,directory):
+		'''Check if directory exists'''
+		return self.run("test -d %s" % (directory))
+
+	def dir_setAttr(self,location = None,user = None,group=None,permissions = None,recursive = False):
+		'''Set directory permissions'''
+		if recursive:
+			recursive = " -R"
+		else:
+			recursive = ""
+		if group:
+			self.run("chgrp %s %s %s" % (recursive,group,location))
+		if permissions:
+			self.run("chmod %s %s %s" % (recursive,permissions,location))
+		if user:
+			self.run("chown %s %s %s" % (recursive,user,location))
+
+	def ensureDirectory(self,destination = None , user =None,group = None, permissions =None,recursive= False):
+		'''Ensures a directory is created'''
+		if (destination is None):
+			warn("Destination of directory must be specified")
+			return False
+		if (self.dir_exists(destination).return_code == 0):
+			warn("Destination folder already exists; Just setting permissions")
+			self.dir_setAttr(destination,user,group,permissions,recursive)
+		else:
+			self.run("mkdir -p %s" % (destination))
+			self.dir_setAttr(destination,user,group,permissions,recursive)
 
 
 
