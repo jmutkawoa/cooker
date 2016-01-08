@@ -4,7 +4,7 @@
 #License: BSD
 
 from threading import Thread
-import os, re, tempfile, sys, time
+import os, re, tempfile, sys, time, string
 import fabric , fabric.operations, fabric.context_managers
 import ansible
 from fabric.api import *
@@ -205,7 +205,11 @@ class cooker:
 	#=========================
 	def dir_exists(self,directory):
 		'''Check if directory exists'''
-		return self.run("test -d %s" % (directory))
+		if ((self.run("test -d %s" % (directory))).return_code == 0):
+			return True
+		else:
+			warn("Directory doesnot exists")
+			return False
 
 	def dir_setAttr(self,location = None,user = None,group=None,permissions = None,recursive = False):
 		'''Set directory permissions'''
@@ -225,9 +229,74 @@ class cooker:
 		if (destination is None):
 			warn("Destination of directory must be specified")
 			return False
-		if (self.dir_exists(destination).return_code == 0):
+		if (self.dir_exists(destination)):
 			warn("Destination folder already exists; Just setting permissions")
 			self.dir_setAttr(destination,user,group,permissions,recursive)
 		else:
 			self.run("mkdir -p %s" % (destination))
 			self.dir_setAttr(destination,user,group,permissions,recursive)
+
+	def dir_remove(self,directory,recursive = False):
+		'''Remove a directory'''
+		if(self.dir_exists(directory)):
+			argument = ""
+			if recursive:
+				argument = "r"
+			self.run("rm -%sf %s && echo 'Directory %s removed' " % (argument,directory,directory))
+		else:
+			warn("Directory doesnot exists")
+
+	def dir_list(self,directory,options=None):
+		'''list directory'''
+		if(self.dir_exists(directory)):
+			options = options and "-"+options or ""
+			return self.run("ls %s %s" % (options,directory))
+		else:
+			warn("Directory doesnot exists")
+			return False
+
+	def dir_getPermission(self,directory,hexa = False):
+		'''Get permission of a directory'''
+		if(self.dir_exists(directory)):
+			argument = hexa and '%a' or '%A'
+			return self.run("stat -c %s %s" % (argument,directory))
+
+	def dir_getGroup(self,directory,octal = False):
+		'''Get group of the directory'''
+		if(self.dir_exists(directory)):
+			argument = octal and '%g' or '%G'
+			return self.run("stat -c %s %s" % (argument,directory))
+
+	def dir_getOwner(self,diretory,octal=False):
+		'''Get Owner of the directory'''
+		if(self.dir_exists(directory)):
+			argument = octal and '%u' or '%U'
+			return self.run("stat -c %s %s" % (argument,directory))
+
+	def dir_getMount(self,directory):
+		'''Get the mounting point of the directory'''
+		if(self.dir_exists(directory)):
+			return self.run("df -P %s | awk '{c++} c==2 {print $NF}'" % (directory))
+
+	def dir_getRunningProcess(self,directory):
+		'''Return array of users using the directory'''
+		if(self.dir_exists(directory)):
+			return string.split(self.run("lsof %s |awk '{print $3}' |sort|uniq |grep -iv USER" % (directory)))
+
+	
+	# ========================
+	#
+	# File Utilities
+	#=========================
+	def file_exists(self,file):
+		'''Check if File exists'''
+		if ((self.run("test -f %s" % (file))).return_code == 0):
+			return True
+		else:
+			warn("File doesnot exists")
+			return False
+
+	def file_setAttr(self,file =None,user = None,group=None,permissions = None):
+		'''Set file permissions'''
+		if(self.file_exists(file)):
+			self.dir_setAttr(location = file,user = user,group=group,permissions = permissions,recursive = False)
