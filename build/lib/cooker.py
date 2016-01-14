@@ -143,16 +143,6 @@ class cooker:
 			fabric.utils.abort("Source and Destination must be specified")
 		self.run("mv %s %s" % (source,destination))
 
-	def fileContains(self,path,text,exact):
-		'''Check if file contains the searched keywoord'''
-		if (self.getMode() is "local"):
-			result = local("grep %s %s" %(text,path),True)
-			if result.return_code == 0:
-				return True
-			else:
-				return False
-		return fabric.contrib.files.contains(path,text,exact)
-
 	def fileIso(self,file1,file2):
 		'''Check if two files are iso'''
 		cmd = "openssl dgst -md5 %s|awk '{print $2}'"
@@ -164,7 +154,7 @@ class cooker:
 
 	def createUser(self,user,password = None,home = None,shell = None,group = None,createHome = True ):
 		'''Create new user'''
-		if(self.fileContains("/etc/passwd",user,False)):
+		if(self.file_Contains("/etc/passwd",user,False)):
 			warn("User %s already exists!!!" % user)
 			return False
 		options = []
@@ -293,10 +283,47 @@ class cooker:
 		if ((self.run("test -f %s" % (file))).return_code == 0):
 			return True
 		else:
-			warn("File doesnot exists")
+			warn("File %s doesnot exists" % file)
 			return False
 
 	def file_setAttr(self,file =None,user = None,group=None,permissions = None):
 		'''Set file permissions'''
 		if(self.file_exists(file)):
 			self.dir_setAttr(location = file,user = user,group=group,permissions = permissions,recursive = False)
+
+	def file_Contains(self,path,text,exact):
+		'''Check if file contains the searched keywoord'''
+		if (self.getMode() is "local"):
+			result = local("grep %s %s" %(text,path),True)
+			if result.return_code == 0:
+				return True
+			else:
+				return False
+		return fabric.contrib.files.contains(path,text,exact)
+
+	def file_getHash(self,files,algorithm="md5sum"):
+		'''return Hash of files'''
+		SupportedAlgorithm = ["md5","sha256","sha512"]
+		assert algorithm in SupportedAlgorithm, "Algorithm must be one of: %s" % (SupportedAlgorithm)
+		Hashes = {}
+		if isinstance(files,list):
+			for file in files:
+				if self.file_exists(file):
+					hash = self.run("openssl dgst -%s %s |cut -d = -f2" % (algorithm,file)).strip()
+					Hashes[file] = hash
+				else:
+					Hashes[file] = None
+		elif isinstance(files,str):
+			if self.file_exists(files):
+				hash = self.run("openssl dgst -%s %s |cut -d = -f2" % (algorithm,files)).strip()
+				Hashes[files] = hash
+			else:
+				Hashes[files] = None
+		return Hashes
+
+	def file_diff(self,files):
+		'''Get difference between two files'''
+		for file in files:
+			if not self.file_exists(file):
+				return False
+		return self.run("diff -uNp %s %s" %(files[0],files[1]))

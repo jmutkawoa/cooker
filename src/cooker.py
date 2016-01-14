@@ -283,7 +283,7 @@ class cooker:
 		if ((self.run("test -f %s" % (file))).return_code == 0):
 			return True
 		else:
-			warn("File doesnot exists")
+			warn("File %s doesnot exists" % file)
 			return False
 
 	def file_setAttr(self,file =None,user = None,group=None,permissions = None):
@@ -300,3 +300,30 @@ class cooker:
 			else:
 				return False
 		return fabric.contrib.files.contains(path,text,exact)
+
+	def file_getHash(self,files,algorithm="md5sum"):
+		'''return Hash of files'''
+		SupportedAlgorithm = ["md5","sha256","sha512"]
+		assert algorithm in SupportedAlgorithm, "Algorithm must be one of: %s" % (SupportedAlgorithm)
+		Hashes = {}
+		if isinstance(files,list):
+			for file in files:
+				if self.file_exists(file):
+					hash = self.run("openssl dgst -%s %s |cut -d = -f2" % (algorithm,file)).strip()
+					Hashes[file] = hash
+				else:
+					Hashes[file] = None
+		elif isinstance(files,str):
+			if self.file_exists(files):
+				hash = self.run("openssl dgst -%s %s |cut -d = -f2" % (algorithm,files)).strip()
+				Hashes[files] = hash
+			else:
+				Hashes[files] = None
+		return Hashes
+
+	def file_diff(self,files):
+		'''Get difference between two files'''
+		for file in files:
+			if not self.file_exists(file):
+				return False
+		return self.run("diff -uNp %s %s" %(files[0],files[1]))
