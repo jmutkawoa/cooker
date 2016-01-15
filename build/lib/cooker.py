@@ -273,6 +273,17 @@ class cooker:
 		if(self.dir_exists(directory)):
 			return string.split(self.run("lsof %s |awk '{print $3}' |sort|uniq |grep -iv USER" % (directory)))
 
+	def dir_getHash(self,directory,algorithm="md5",sum=False):
+		'''Get hash of files in directory'''
+		SupportedAlgorithm = ["md5","sha256","sha512"]
+		assert algorithm in SupportedAlgorithm, "Algorithm must be one of: %s" % (SupportedAlgorithm)
+		if(self.dir_exists(directory)):
+			if not sum:
+				puts("Please be patient the command might take some time")
+				return self.run("find %s -type f -print0 | xargs -0 openssl dgst -%s" % (directory,algorithm))
+			else:
+				return self.run("cmd=`find %s -type f -print0 | xargs -0 openssl dgst -%s` && echo $cmd | openssl dgst -%s |cut -d = -f2" % (directory,algorithm,algorithm))
+
 	
 	# ========================
 	#
@@ -301,7 +312,7 @@ class cooker:
 				return False
 		return fabric.contrib.files.contains(path,text,exact)
 
-	def file_getHash(self,files,algorithm="md5sum"):
+	def file_getHash(self,files,algorithm="md5"):
 		'''return Hash of files'''
 		SupportedAlgorithm = ["md5","sha256","sha512"]
 		assert algorithm in SupportedAlgorithm, "Algorithm must be one of: %s" % (SupportedAlgorithm)

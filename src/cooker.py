@@ -193,6 +193,19 @@ class cooker:
 	#
 	# Directory Utilities
 	#=========================
+
+	def dir_ensure(self,destination = None , user =None,group = None, permissions =None,recursive= False):
+		'''Ensures a directory is created'''
+		if (destination is None):
+			warn("Destination of directory must be specified")
+			return False
+		if (self.dir_exists(destination)):
+			warn("Destination folder already exists; Just setting permissions")
+			self.dir_setAttr(destination,user,group,permissions,recursive)
+		else:
+			self.run("mkdir -p %s" % (destination))
+			self.dir_setAttr(destination,user,group,permissions,recursive)
+
 	def dir_exists(self,directory):
 		'''Check if directory exists'''
 		if ((self.run("test -d %s" % (directory))).return_code == 0):
@@ -200,6 +213,59 @@ class cooker:
 		else:
 			warn("Directory doesnot exists")
 			return False
+
+	
+
+	def dir_getGroup(self,directory,octal = False):
+		'''Get group of the directory'''
+		if(self.dir_exists(directory)):
+			argument = octal and '%g' or '%G'
+			return self.run("stat -c %s %s" % (argument,directory))
+
+	def dir_getHash(self,directory,algorithm="md5",sum=False):
+		'''Get hash of files in directory'''
+		SupportedAlgorithm = ["md5","sha256","sha512"]
+		assert algorithm in SupportedAlgorithm, "Algorithm must be one of: %s" % (SupportedAlgorithm)
+		if(self.dir_exists(directory)):
+			if not sum:
+				puts("Please be patient the command might take some time")
+				return self.run("find %s -type f -print0 | xargs -0 openssl dgst -%s" % (directory,algorithm))
+			else:
+				return self.run("cmd=`find %s -type f -print0 | xargs -0 openssl dgst -%s` && echo $cmd | openssl dgst -%s |cut -d = -f2" % (directory,algorithm,algorithm))
+
+	
+	def dir_getMount(self,directory):
+		'''Get the mounting point of the directory'''
+		if(self.dir_exists(directory)):
+			return self.run("df -P %s | awk '{c++} c==2 {print $NF}'" % (directory))
+
+	def dir_getOwner(self,diretory,octal=False):
+		'''Get Owner of the directory'''
+		if(self.dir_exists(directory)):
+			argument = octal and '%u' or '%U'
+			return self.run("stat -c %s %s" % (argument,directory))
+
+	def dir_getPermission(self,directory,hexa = False):
+		'''Get permission of a directory'''
+		if(self.dir_exists(directory)):
+			argument = hexa and '%a' or '%A'
+			return self.run("stat -c %s %s" % (argument,directory))
+
+	def dir_getRunningProcess(self,directory):
+		'''Return array of users using the directory'''
+		if(self.dir_exists(directory)):
+			return string.split(self.run("lsof %s |awk '{print $3}' |sort|uniq |grep -iv USER" % (directory)))
+
+
+	def dir_list(self,directory,options=None):
+		'''list directory'''
+		if(self.dir_exists(directory)):
+			options = options and "-"+options or ""
+			return self.run("ls %s %s" % (options,directory))
+		else:
+			warn("Directory doesnot exists")
+			return False
+
 
 	def dir_setAttr(self,location = None,user = None,group=None,permissions = None,recursive = False):
 		'''Set directory permissions'''
@@ -214,17 +280,6 @@ class cooker:
 		if user:
 			self.run("chown %s %s %s" % (recursive,user,location))
 
-	def dir_ensure(self,destination = None , user =None,group = None, permissions =None,recursive= False):
-		'''Ensures a directory is created'''
-		if (destination is None):
-			warn("Destination of directory must be specified")
-			return False
-		if (self.dir_exists(destination)):
-			warn("Destination folder already exists; Just setting permissions")
-			self.dir_setAttr(destination,user,group,permissions,recursive)
-		else:
-			self.run("mkdir -p %s" % (destination))
-			self.dir_setAttr(destination,user,group,permissions,recursive)
 
 	def dir_remove(self,directory,recursive = False):
 		'''Remove a directory'''
@@ -235,49 +290,30 @@ class cooker:
 			self.run("rm -%sf %s && echo 'Directory %s removed' " % (argument,directory,directory))
 		else:
 			warn("Directory doesnot exists")
-
-	def dir_list(self,directory,options=None):
-		'''list directory'''
-		if(self.dir_exists(directory)):
-			options = options and "-"+options or ""
-			return self.run("ls %s %s" % (options,directory))
-		else:
-			warn("Directory doesnot exists")
-			return False
-
-	def dir_getPermission(self,directory,hexa = False):
-		'''Get permission of a directory'''
-		if(self.dir_exists(directory)):
-			argument = hexa and '%a' or '%A'
-			return self.run("stat -c %s %s" % (argument,directory))
-
-	def dir_getGroup(self,directory,octal = False):
-		'''Get group of the directory'''
-		if(self.dir_exists(directory)):
-			argument = octal and '%g' or '%G'
-			return self.run("stat -c %s %s" % (argument,directory))
-
-	def dir_getOwner(self,diretory,octal=False):
-		'''Get Owner of the directory'''
-		if(self.dir_exists(directory)):
-			argument = octal and '%u' or '%U'
-			return self.run("stat -c %s %s" % (argument,directory))
-
-	def dir_getMount(self,directory):
-		'''Get the mounting point of the directory'''
-		if(self.dir_exists(directory)):
-			return self.run("df -P %s | awk '{c++} c==2 {print $NF}'" % (directory))
-
-	def dir_getRunningProcess(self,directory):
-		'''Return array of users using the directory'''
-		if(self.dir_exists(directory)):
-			return string.split(self.run("lsof %s |awk '{print $3}' |sort|uniq |grep -iv USER" % (directory)))
-
+	
 	
 	# ========================
 	#
 	# File Utilities
 	#=========================
+
+	def file_Contains(self,path,text,exact):
+		'''Check if file contains the searched keywoord'''
+		if (self.getMode() is "local"):
+			result = local("grep %s %s" %(text,path),True)
+			if result.return_code == 0:
+				return True
+			else:
+				return False
+		return fabric.contrib.files.contains(path,text,exact)
+
+	def file_diff(self,files):
+		'''Get difference between two files'''
+		for file in files:
+			if not self.file_exists(file):
+				return False
+		return self.run("diff -uNp %s %s" %(files[0],files[1]))
+
 	def file_exists(self,file):
 		'''Check if File exists'''
 		if ((self.run("test -f %s" % (file))).return_code == 0):
@@ -291,17 +327,7 @@ class cooker:
 		if(self.file_exists(file)):
 			self.dir_setAttr(location = file,user = user,group=group,permissions = permissions,recursive = False)
 
-	def file_Contains(self,path,text,exact):
-		'''Check if file contains the searched keywoord'''
-		if (self.getMode() is "local"):
-			result = local("grep %s %s" %(text,path),True)
-			if result.return_code == 0:
-				return True
-			else:
-				return False
-		return fabric.contrib.files.contains(path,text,exact)
-
-	def file_getHash(self,files,algorithm="md5sum"):
+	def file_getHash(self,files,algorithm="md5"):
 		'''return Hash of files'''
 		SupportedAlgorithm = ["md5","sha256","sha512"]
 		assert algorithm in SupportedAlgorithm, "Algorithm must be one of: %s" % (SupportedAlgorithm)
@@ -321,9 +347,4 @@ class cooker:
 				Hashes[files] = None
 		return Hashes
 
-	def file_diff(self,files):
-		'''Get difference between two files'''
-		for file in files:
-			if not self.file_exists(file):
-				return False
-		return self.run("diff -uNp %s %s" %(files[0],files[1]))
+	
