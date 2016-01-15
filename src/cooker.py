@@ -347,4 +347,32 @@ class cooker:
 				Hashes[files] = None
 		return Hashes
 
-	
+	# ========================
+	#
+	# Process Utilities
+	#=========================
+
+	def process_find(self,process,exact=True):
+		'''Find the process and return the user an array
+		of PD of the matched process'''
+		options = exact and "-w" or ""
+		PROCESS = {}
+		if isinstance(process,list):
+			for p in process:
+				processes  = self.run("ps -A |grep %s %s |awk '{print $1}'" % (options,p))
+				pids = []
+				for pid in processes.splitlines():
+					pids.append(pid)
+				PROCESS[p] = pids
+		elif isinstance(process,str):
+			pids = []
+			for pid in self.run("ps -A |grep %s %s |awk '{print $1}'" % (options,process)).splitlines():
+				pids.append(pid)
+			PROCESS[process] = pids
+		return PROCESS
+
+	def process_killByName(self,process):
+		'''Kill a process by its name'''
+		PROCESS = self.process_find(process)
+		for p in PROCESS[process]:
+			self.run("kill -9 %s" % p)
