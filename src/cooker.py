@@ -376,3 +376,9 @@ class cooker:
 		PROCESS = self.process_find(process)
 		for p in PROCESS[process]:
 			self.run("kill -9 %s" % p)
+
+	def process_sendSignal(self,process,signal):
+		'''Sends signal to a process'''
+		PROCESS = self.process_find(process)
+		for p in PROCESS[process]:
+			self.run("kill -%s %s"%(signal,p))
