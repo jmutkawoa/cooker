@@ -382,3 +382,23 @@ class cooker:
 		PROCESS = self.process_find(process)
 		for p in PROCESS[process]:
 			self.run("kill -%s %s"%(signal,p))
+
+	def process_swapValue(self,process):
+		'''return the process Swap value'''
+		swaps = {}
+		if isinstance(process,str):
+			PROCESS = self.process_find(process)
+			swap = {}
+			for p in PROCESS[process]:
+				swap[p] = self.run("cat /proc/%s/status |awk '/VmSwap|Name/{printf $2 \" \" $3}END{ print \"\"}' |awk '{print $2 \" \" $3}'" %(p))
+				swaps[process] = swap
+			return swaps
+		elif isinstance(process,list):
+			ProcessDict = []
+			for p in process:
+				PROCESS = self.process_find(p)
+				for p in PROCESS:
+					result = self.process_swapValue(p)
+					if(result):
+						ProcessDict.append(result)
+			return ProcessDict
