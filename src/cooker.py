@@ -387,18 +387,20 @@ class cooker:
 		'''return the process Swap value'''
 		swaps = {}
 		if isinstance(process,str):
+			ProcessList = []
 			PROCESS = self.process_find(process)
 			swap = {}
 			for p in PROCESS[process]:
 				swap[p] = self.run("cat /proc/%s/status |awk '/VmSwap|Name/{printf $2 \" \" $3}END{ print \"\"}' |awk '{print $2 \" \" $3}'" %(p))
 				swaps[process] = swap
-			return swaps
+			ProcessList.append(swaps)
+			return ProcessList
 		elif isinstance(process,list):
-			ProcessDict = []
+			ProcessList = []
 			for p in process:
 				PROCESS = self.process_find(p)
 				for p in PROCESS:
 					result = self.process_swapValue(p)
 					if(result):
-						ProcessDict.append(result)
-			return ProcessDict
+						ProcessList.append(result)
+			return ProcessList
