@@ -349,6 +349,32 @@ class cooker:
 
 	# ========================
 	#
+	# Network Utilities
+	#=========================
+
+	def net_route(self,arguments):
+		'''Return Routes'''
+		options = []
+		if arguments:
+			options.append(" -%s" % (arguments))
+		return self.run("route %s" % ("".join(options)))
+
+	def net_stat(self,arguments=None,search=None,caseSensitive=True):
+		'''Return Netstat'''
+		options = []
+		if arguments:
+			options.append(" -%s" % (arguments))
+		if search:
+			if not caseSensitive:
+				options.append("|grep -i")
+			else:
+				options.append("|grep")
+			options.append("  %s" % (search))
+		return self.run("netstat %s" % ("".join(options)))
+
+
+	# ========================
+	#
 	# Process Utilities
 	#=========================
 

@@ -251,7 +251,7 @@ class cooker:
 			argument = hexa and '%a' or '%A'
 			return self.run("stat -c %s %s" % (argument,directory))
 
-	def dir_getRunningProcess(self,directory):
+	def dir_getRunningProcessUser(self,directory):
 		'''Return array of users using the directory'''
 		if(self.dir_exists(directory)):
 			return string.split(self.run("lsof %s |awk '{print $3}' |sort|uniq |grep -iv USER" % (directory)))
@@ -346,6 +346,32 @@ class cooker:
 			else:
 				Hashes[files] = None
 		return Hashes
+
+	# ========================
+	#
+	# Network Utilities
+	#=========================
+
+	def net_route(self,arguments):
+		'''Return Routes'''
+		options = []
+		if arguments:
+			options.append(" -%s" % (arguments))
+		return self.run("route %s" % ("".join(options)))
+
+	def net_stat(self,arguments=None,search=None,caseSensitive=True):
+		'''Return Netstat'''
+		options = []
+		if arguments:
+			options.append(" -%s" % (arguments))
+		if search:
+			if not caseSensitive:
+				options.append("|grep -i")
+			else:
+				options.append("|grep")
+			options.append("  %s" % (search))
+		return self.run("netstat %s" % ("".join(options)))
+
 
 	# ========================
 	#
