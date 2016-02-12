@@ -103,6 +103,14 @@ class cooker:
 	def apt_update(self):
 		return self.run("apt-get -y update")
 
+	def extract(self,text,word):
+		'''Extract mathing lines from text'''
+		result = ""
+		for lines in text.split("\n"):
+			if word in lines:
+				result = result + lines + "\n"
+		return result
+
 	def yum_package_ensure(self,package):
 		'''Install Package using yum'''
 		if (self.getMode() is "local"):
