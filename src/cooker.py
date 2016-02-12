@@ -251,7 +251,7 @@ class cooker:
 			argument = hexa and '%a' or '%A'
 			return self.run("stat -c %s %s" % (argument,directory))
 
-	def dir_getRunningProcess(self,directory):
+	def dir_getRunningProcessUser(self,directory):
 		'''Return array of users using the directory'''
 		if(self.dir_exists(directory)):
 			return string.split(self.run("lsof %s |awk '{print $3}' |sort|uniq |grep -iv USER" % (directory)))
@@ -376,6 +376,14 @@ class cooker:
 		PROCESS = self.process_find(process)
 		for p in PROCESS[process]:
 			self.run("kill -9 %s" % p)
+
+	def process_maps(self,process):
+		'''Returns maps of process'''
+		PROCESS = self.process_find(process)
+		MAPS = {}
+		for p in PROCESS[process]:
+			MAPS[p] = self.run("cat /proc/%s/maps" % (p))
+		return MAPS
 
 	def process_sendSignal(self,process,signal):
 		'''Sends signal to a process'''

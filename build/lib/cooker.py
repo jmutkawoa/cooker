@@ -377,6 +377,14 @@ class cooker:
 		for p in PROCESS[process]:
 			self.run("kill -9 %s" % p)
 
+	def process_maps(self,process):
+		'''Returns maps of process'''
+		PROCESS = self.process_find(process)
+		MAPS = {}
+		for p in PROCESS[process]:
+			MAPS[p] = self.run("cat /proc/%s/maps" % (p))
+		return MAPS
+
 	def process_sendSignal(self,process,signal):
 		'''Sends signal to a process'''
 		PROCESS = self.process_find(process)
