@@ -85,13 +85,13 @@ class cooker:
 			func = getattr(self,func_name,func_not_found)
 			func(package)
 
-	def update(self):
+	def update(self,excludes=None):
 		'''Update dispatcher'''
 		def func_not_found(): 
         		print "No Function " + self.i + " Found!"
 		func_name = self.getPackage() + "_update"
 		func = getattr(self,func_name,func_not_found)
-		func()
+		func(excludes)
 
 	def apt_package_ensure(self,package):
 		if (self.getMode() is "local"):
@@ -127,9 +127,15 @@ class cooker:
 			warn("Package %s not installed" % package)
 			return False
 
-	def yum_update(self):
+	def yum_update(self,excludes):
 		'''Updates the OS'''
-		return self.run("yum -y update")
+		exclusion = []
+		if isinstance(excludes,list):
+			for package in excludes:
+				exclusion.append(" -x '%s'" % (package))
+		else:
+			exclusion.append(" -x '%s'" % (exclusion))
+		return self.run("yum -y %s update" % ("".join(exclusion)))
 
 	# ========================
 	#
