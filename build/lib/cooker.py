@@ -85,13 +85,13 @@ class cooker:
 			func = getattr(self,func_name,func_not_found)
 			func(package)
 
-	def update(self):
+	def update(self,excludes=None):
 		'''Update dispatcher'''
 		def func_not_found(): 
         		print "No Function " + self.i + " Found!"
 		func_name = self.getPackage() + "_update"
 		func = getattr(self,func_name,func_not_found)
-		func()
+		func(excludes)
 
 	def apt_package_ensure(self,package):
 		if (self.getMode() is "local"):
@@ -102,6 +102,14 @@ class cooker:
 
 	def apt_update(self):
 		return self.run("apt-get -y update")
+
+	def extract(self,text,word):
+		'''Extract mathing lines from text'''
+		result = ""
+		for lines in text.split("\n"):
+			if word in lines:
+				result = result + lines + "\n"
+		return result
 
 	def yum_package_ensure(self,package):
 		'''Install Package using yum'''
@@ -119,9 +127,15 @@ class cooker:
 			warn("Package %s not installed" % package)
 			return False
 
-	def yum_update(self):
+	def yum_update(self,excludes):
 		'''Updates the OS'''
-		return self.run("yum -y update")
+		exclusion = []
+		if isinstance(excludes,list):
+			for package in excludes:
+				exclusion.append(" -x '%s'" % (package))
+		else:
+			exclusion.append(" -x '%s'" % (exclusion))
+		return self.run("yum -y %s update" % ("".join(exclusion)))
 
 	# ========================
 	#
@@ -193,6 +207,19 @@ class cooker:
 	#
 	# Directory Utilities
 	#=========================
+
+	def dir_ensure(self,destination = None , user =None,group = None, permissions =None,recursive= False):
+		'''Ensures a directory is created'''
+		if (destination is None):
+			warn("Destination of directory must be specified")
+			return False
+		if (self.dir_exists(destination)):
+			warn("Destination folder already exists; Just setting permissions")
+			self.dir_setAttr(destination,user,group,permissions,recursive)
+		else:
+			self.run("mkdir -p %s" % (destination))
+			self.dir_setAttr(destination,user,group,permissions,recursive)
+
 	def dir_exists(self,directory):
 		'''Check if directory exists'''
 		if ((self.run("test -d %s" % (directory))).return_code == 0):
@@ -200,6 +227,59 @@ class cooker:
 		else:
 			warn("Directory doesnot exists")
 			return False
+
+	
+
+	def dir_getGroup(self,directory,octal = False):
+		'''Get group of the directory'''
+		if(self.dir_exists(directory)):
+			argument = octal and '%g' or '%G'
+			return self.run("stat -c %s %s" % (argument,directory))
+
+	def dir_getHash(self,directory,algorithm="md5",sum=False):
+		'''Get hash of files in directory'''
+		SupportedAlgorithm = ["md5","sha256","sha512"]
+		assert algorithm in SupportedAlgorithm, "Algorithm must be one of: %s" % (SupportedAlgorithm)
+		if(self.dir_exists(directory)):
+			if not sum:
+				puts("Please be patient the command might take some time")
+				return self.run("find %s -type f -print0 | xargs -0 openssl dgst -%s" % (directory,algorithm))
+			else:
+				return self.run("cmd=`find %s -type f -print0 | xargs -0 openssl dgst -%s` && echo $cmd | openssl dgst -%s |cut -d = -f2" % (directory,algorithm,algorithm))
+
+	
+	def dir_getMount(self,directory):
+		'''Get the mounting point of the directory'''
+		if(self.dir_exists(directory)):
+			return self.run("df -P %s | awk '{c++} c==2 {print $NF}'" % (directory))
+
+	def dir_getOwner(self,diretory,octal=False):
+		'''Get Owner of the directory'''
+		if(self.dir_exists(directory)):
+			argument = octal and '%u' or '%U'
+			return self.run("stat -c %s %s" % (argument,directory))
+
+	def dir_getPermission(self,directory,hexa = False):
+		'''Get permission of a directory'''
+		if(self.dir_exists(directory)):
+			argument = hexa and '%a' or '%A'
+			return self.run("stat -c %s %s" % (argument,directory))
+
+	def dir_getRunningProcessUser(self,directory):
+		'''Return array of users using the directory'''
+		if(self.dir_exists(directory)):
+			return string.split(self.run("lsof %s |awk '{print $3}' |sort|uniq |grep -iv USER" % (directory)))
+
+
+	def dir_list(self,directory,options=None):
+		'''list directory'''
+		if(self.dir_exists(directory)):
+			options = options and "-"+options or ""
+			return self.run("ls %s %s" % (options,directory))
+		else:
+			warn("Directory doesnot exists")
+			return False
+
 
 	def dir_setAttr(self,location = None,user = None,group=None,permissions = None,recursive = False):
 		'''Set directory permissions'''
@@ -214,17 +294,6 @@ class cooker:
 		if user:
 			self.run("chown %s %s %s" % (recursive,user,location))
 
-	def dir_ensure(self,destination = None , user =None,group = None, permissions =None,recursive= False):
-		'''Ensures a directory is created'''
-		if (destination is None):
-			warn("Destination of directory must be specified")
-			return False
-		if (self.dir_exists(destination)):
-			warn("Destination folder already exists; Just setting permissions")
-			self.dir_setAttr(destination,user,group,permissions,recursive)
-		else:
-			self.run("mkdir -p %s" % (destination))
-			self.dir_setAttr(destination,user,group,permissions,recursive)
 
 	def dir_remove(self,directory,recursive = False):
 		'''Remove a directory'''
@@ -235,60 +304,30 @@ class cooker:
 			self.run("rm -%sf %s && echo 'Directory %s removed' " % (argument,directory,directory))
 		else:
 			warn("Directory doesnot exists")
-
-	def dir_list(self,directory,options=None):
-		'''list directory'''
-		if(self.dir_exists(directory)):
-			options = options and "-"+options or ""
-			return self.run("ls %s %s" % (options,directory))
-		else:
-			warn("Directory doesnot exists")
-			return False
-
-	def dir_getPermission(self,directory,hexa = False):
-		'''Get permission of a directory'''
-		if(self.dir_exists(directory)):
-			argument = hexa and '%a' or '%A'
-			return self.run("stat -c %s %s" % (argument,directory))
-
-	def dir_getGroup(self,directory,octal = False):
-		'''Get group of the directory'''
-		if(self.dir_exists(directory)):
-			argument = octal and '%g' or '%G'
-			return self.run("stat -c %s %s" % (argument,directory))
-
-	def dir_getOwner(self,diretory,octal=False):
-		'''Get Owner of the directory'''
-		if(self.dir_exists(directory)):
-			argument = octal and '%u' or '%U'
-			return self.run("stat -c %s %s" % (argument,directory))
-
-	def dir_getMount(self,directory):
-		'''Get the mounting point of the directory'''
-		if(self.dir_exists(directory)):
-			return self.run("df -P %s | awk '{c++} c==2 {print $NF}'" % (directory))
-
-	def dir_getRunningProcess(self,directory):
-		'''Return array of users using the directory'''
-		if(self.dir_exists(directory)):
-			return string.split(self.run("lsof %s |awk '{print $3}' |sort|uniq |grep -iv USER" % (directory)))
-
-	def dir_getHash(self,directory,algorithm="md5",sum=False):
-		'''Get hash of files in directory'''
-		SupportedAlgorithm = ["md5","sha256","sha512"]
-		assert algorithm in SupportedAlgorithm, "Algorithm must be one of: %s" % (SupportedAlgorithm)
-		if(self.dir_exists(directory)):
-			if not sum:
-				puts("Please be patient the command might take some time")
-				return self.run("find %s -type f -print0 | xargs -0 openssl dgst -%s" % (directory,algorithm))
-			else:
-				return self.run("cmd=`find %s -type f -print0 | xargs -0 openssl dgst -%s` && echo $cmd | openssl dgst -%s |cut -d = -f2" % (directory,algorithm,algorithm))
-
+	
 	
 	# ========================
 	#
 	# File Utilities
 	#=========================
+
+	def file_Contains(self,path,text,exact):
+		'''Check if file contains the searched keywoord'''
+		if (self.getMode() is "local"):
+			result = local("grep %s %s" %(text,path),True)
+			if result.return_code == 0:
+				return True
+			else:
+				return False
+		return fabric.contrib.files.contains(path,text,exact)
+
+	def file_diff(self,files):
+		'''Get difference between two files'''
+		for file in files:
+			if not self.file_exists(file):
+				return False
+		return self.run("diff -uNp %s %s" %(files[0],files[1]))
+
 	def file_exists(self,file):
 		'''Check if File exists'''
 		if ((self.run("test -f %s" % (file))).return_code == 0):
@@ -301,16 +340,6 @@ class cooker:
 		'''Set file permissions'''
 		if(self.file_exists(file)):
 			self.dir_setAttr(location = file,user = user,group=group,permissions = permissions,recursive = False)
-
-	def file_Contains(self,path,text,exact):
-		'''Check if file contains the searched keywoord'''
-		if (self.getMode() is "local"):
-			result = local("grep %s %s" %(text,path),True)
-			if result.return_code == 0:
-				return True
-			else:
-				return False
-		return fabric.contrib.files.contains(path,text,exact)
 
 	def file_getHash(self,files,algorithm="md5"):
 		'''return Hash of files'''
@@ -332,9 +361,94 @@ class cooker:
 				Hashes[files] = None
 		return Hashes
 
-	def file_diff(self,files):
-		'''Get difference between two files'''
-		for file in files:
-			if not self.file_exists(file):
-				return False
-		return self.run("diff -uNp %s %s" %(files[0],files[1]))
+	# ========================
+	#
+	# Network Utilities
+	#=========================
+
+	def net_route(self,arguments):
+		'''Return Routes'''
+		options = []
+		if arguments:
+			options.append(" -%s" % (arguments))
+		return self.run("route %s" % ("".join(options)))
+
+	def net_stat(self,arguments=None,search=None,caseSensitive=True):
+		'''Return Netstat'''
+		options = []
+		if arguments:
+			options.append(" -%s" % (arguments))
+		if search:
+			if not caseSensitive:
+				options.append("|grep -i")
+			else:
+				options.append("|grep")
+			options.append("  %s" % (search))
+		return self.run("netstat %s" % ("".join(options)))
+
+
+	# ========================
+	#
+	# Process Utilities
+	#=========================
+
+	def process_find(self,process,exact=True):
+		'''Find the process and return the user an array
+		of PD of the matched process'''
+		options = exact and "-w" or ""
+		PROCESS = {}
+		if isinstance(process,list):
+			for p in process:
+				processes  = self.run("ps -A |grep %s %s |awk '{print $1}'" % (options,p))
+				pids = []
+				for pid in processes.splitlines():
+					pids.append(pid)
+				PROCESS[p] = pids
+		elif isinstance(process,str):
+			pids = []
+			for pid in self.run("ps -A |grep %s %s |awk '{print $1}'" % (options,process)).splitlines():
+				pids.append(pid)
+			PROCESS[process] = pids
+		return PROCESS
+
+	def process_killByName(self,process):
+		'''Kill a process by its name'''
+		PROCESS = self.process_find(process)
+		for p in PROCESS[process]:
+			self.run("kill -9 %s" % p)
+
+	def process_maps(self,process):
+		'''Returns maps of process'''
+		PROCESS = self.process_find(process)
+		MAPS = {}
+		for p in PROCESS[process]:
+			MAPS[p] = self.run("cat /proc/%s/maps" % (p))
+		return MAPS
+
+	def process_sendSignal(self,process,signal):
+		'''Sends signal to a process'''
+		PROCESS = self.process_find(process)
+		for p in PROCESS[process]:
+			self.run("kill -%s %s"%(signal,p))
+
+	def process_swapValue(self,process):
+		'''return the process Swap value'''
+		swaps = {}
+		if isinstance(process,str):
+			ProcessList = []
+			PROCESS = self.process_find(process)
+			swap = {}
+			for p in PROCESS[process]:
+				swap[p] = self.run("cat /proc/%s/status |awk '/VmSwap|Name/{printf $2 \" \" $3}END{ print \"\"}' |awk '{print $2 \" \" $3}'" %(p))
+				swaps[process] = swap
+			ProcessList.append(swaps)
+			return ProcessList
+		elif isinstance(process,list):
+			ProcessList = []
+			for p in process:
+				PROCESS = self.process_find(p)
+				for p in PROCESS:
+					result = self.process_swapValue(p)
+					if(result):
+						ProcessList.append(result)
+			return ProcessList

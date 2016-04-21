@@ -85,13 +85,13 @@ class cooker:
 			func = getattr(self,func_name,func_not_found)
 			func(package)
 
-	def update(self):
+	def update(self,excludes=None):
 		'''Update dispatcher'''
 		def func_not_found(): 
         		print "No Function " + self.i + " Found!"
 		func_name = self.getPackage() + "_update"
 		func = getattr(self,func_name,func_not_found)
-		func()
+		func(excludes)
 
 	def apt_package_ensure(self,package):
 		if (self.getMode() is "local"):
@@ -102,6 +102,14 @@ class cooker:
 
 	def apt_update(self):
 		return self.run("apt-get -y update")
+
+	def extract(self,text,word):
+		'''Extract mathing lines from text'''
+		result = ""
+		for lines in text.split("\n"):
+			if word in lines:
+				result = result + lines + "\n"
+		return result
 
 	def yum_package_ensure(self,package):
 		'''Install Package using yum'''
@@ -119,9 +127,15 @@ class cooker:
 			warn("Package %s not installed" % package)
 			return False
 
-	def yum_update(self):
+	def yum_update(self,excludes):
 		'''Updates the OS'''
-		return self.run("yum -y update")
+		exclusion = []
+		if isinstance(excludes,list):
+			for package in excludes:
+				exclusion.append(" -x '%s'" % (package))
+		else:
+			exclusion.append(" -x '%s'" % (exclusion))
+		return self.run("yum -y %s update" % ("".join(exclusion)))
 
 	# ========================
 	#
@@ -251,7 +265,7 @@ class cooker:
 			argument = hexa and '%a' or '%A'
 			return self.run("stat -c %s %s" % (argument,directory))
 
-	def dir_getRunningProcess(self,directory):
+	def dir_getRunningProcessUser(self,directory):
 		'''Return array of users using the directory'''
 		if(self.dir_exists(directory)):
 			return string.split(self.run("lsof %s |awk '{print $3}' |sort|uniq |grep -iv USER" % (directory)))
@@ -347,4 +361,94 @@ class cooker:
 				Hashes[files] = None
 		return Hashes
 
-	
+	# ========================
+	#
+	# Network Utilities
+	#=========================
+
+	def net_route(self,arguments):
+		'''Return Routes'''
+		options = []
+		if arguments:
+			options.append(" -%s" % (arguments))
+		return self.run("route %s" % ("".join(options)))
+
+	def net_stat(self,arguments=None,search=None,caseSensitive=True):
+		'''Return Netstat'''
+		options = []
+		if arguments:
+			options.append(" -%s" % (arguments))
+		if search:
+			if not caseSensitive:
+				options.append("|grep -i")
+			else:
+				options.append("|grep")
+			options.append("  %s" % (search))
+		return self.run("netstat %s" % ("".join(options)))
+
+
+	# ========================
+	#
+	# Process Utilities
+	#=========================
+
+	def process_find(self,process,exact=True):
+		'''Find the process and return the user an array
+		of PD of the matched process'''
+		options = exact and "-w" or ""
+		PROCESS = {}
+		if isinstance(process,list):
+			for p in process:
+				processes  = self.run("ps -A |grep %s %s |awk '{print $1}'" % (options,p))
+				pids = []
+				for pid in processes.splitlines():
+					pids.append(pid)
+				PROCESS[p] = pids
+		elif isinstance(process,str):
+			pids = []
+			for pid in self.run("ps -A |grep %s %s |awk '{print $1}'" % (options,process)).splitlines():
+				pids.append(pid)
+			PROCESS[process] = pids
+		return PROCESS
+
+	def process_killByName(self,process):
+		'''Kill a process by its name'''
+		PROCESS = self.process_find(process)
+		for p in PROCESS[process]:
+			self.run("kill -9 %s" % p)
+
+	def process_maps(self,process):
+		'''Returns maps of process'''
+		PROCESS = self.process_find(process)
+		MAPS = {}
+		for p in PROCESS[process]:
+			MAPS[p] = self.run("cat /proc/%s/maps" % (p))
+		return MAPS
+
+	def process_sendSignal(self,process,signal):
+		'''Sends signal to a process'''
+		PROCESS = self.process_find(process)
+		for p in PROCESS[process]:
+			self.run("kill -%s %s"%(signal,p))
+
+	def process_swapValue(self,process):
+		'''return the process Swap value'''
+		swaps = {}
+		if isinstance(process,str):
+			ProcessList = []
+			PROCESS = self.process_find(process)
+			swap = {}
+			for p in PROCESS[process]:
+				swap[p] = self.run("cat /proc/%s/status |awk '/VmSwap|Name/{printf $2 \" \" $3}END{ print \"\"}' |awk '{print $2 \" \" $3}'" %(p))
+				swaps[process] = swap
+			ProcessList.append(swaps)
+			return ProcessList
+		elif isinstance(process,list):
+			ProcessList = []
+			for p in process:
+				PROCESS = self.process_find(p)
+				for p in PROCESS:
+					result = self.process_swapValue(p)
+					if(result):
+						ProcessList.append(result)
+			return ProcessList
